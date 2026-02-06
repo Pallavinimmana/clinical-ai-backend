@@ -15,14 +15,12 @@ Base.metadata.create_all(bind=engine)
 # ---------------- APP ----------------
 app = FastAPI(title="AI Clinical Discrepancy System")
 
-# ---------------- CORS (VERY IMPORTANT) ----------------
+# ---------------- CORS ----------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Vite frontend
-    ],
+    allow_origins=["*"],  # ✅ allow frontend from anywhere (Vercel + local)
     allow_credentials=True,
-    allow_methods=["*"],        # Allow OPTIONS, POST, GET, etc.
+    allow_methods=["*"],  # GET, POST, OPTIONS, etc.
     allow_headers=["*"],
 )
 
