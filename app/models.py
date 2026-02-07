@@ -42,3 +42,13 @@ class LabResult(Base):
     test_name = Column(String)
     value = Column(Float)
     unit = Column(String)
+
+from sqlalchemy import Column, String, Text
+import uuid
+
+class ClinicalNote(Base):
+    __tablename__ = "clinical_notes"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    patient_id = Column(String, index=True, nullable=False)
+    content = Column(Text, nullable=False)

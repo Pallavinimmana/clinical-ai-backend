@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
-from .models import Report, LabResult, Alert
+from .models import Report, LabResult, Alert, ClinicalNote
 from .auth import get_current_user
 from .gemini_service import generate_medical_insight
 
@@ -27,46 +27,56 @@ def analyze_patient(
     user: str = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # 1️⃣ Fetch patient data
+    # 1️⃣ Fetch all patient data
     reports = db.query(Report).filter(Report.patient_id == patient_id).all()
     labs = db.query(LabResult).filter(LabResult.patient_id == patient_id).all()
+    notes = db.query(ClinicalNote).filter(
+        ClinicalNote.patient_id == patient_id
+    ).all()
 
-    # 2️⃣ Safety check
-    if not reports or not labs:
+    # 2️⃣ If absolutely nothing exists
+    if not reports and not labs and not notes:
         return [{
             "severity": "INFO",
-            "message": (
-                "Insufficient data for analysis. "
-                "Please upload both radiology reports and lab results."
-            )
+            "message": "No data found for this patient ID."
         }]
 
     alerts = []
 
-    # 3️⃣ Combine radiology text
+    # 3️⃣ Combine radiology text (CT / MRI / X-ray / Echo)
     radiology_text = " ".join(
         (r.content or "").lower()
         for r in reports
+        if r.report_type
+        and r.report_type.lower() in ["radiology", "ct", "mri", "xray", "echo"]
     )
 
-    # 4️⃣ Extract labs
+    # 4️⃣ Combine clinical notes
+    clinical_text = " ".join(
+        (n.content or "").lower()
+        for n in notes
+    )
+
+    # 5️⃣ Extract lab values safely
     crp = None
     wbc = None
 
     for lab in labs:
         if lab.test_name:
-            if lab.test_name.upper() == "CRP":
+            name = lab.test_name.upper()
+            if name == "CRP":
                 crp = lab.value
-            elif lab.test_name.upper() == "WBC":
+            elif name == "WBC":
                 wbc = lab.value
 
-    # 5️⃣ Detect infection-negative language
+    # 6️⃣ Detect infection-negative language
     infection_negative = any(
         phrase in radiology_text
         for phrase in [
             "no infection",
             "no evidence of infection",
             "no signs of infection",
+            "no acute infection",
         ]
     )
 
@@ -102,10 +112,11 @@ def analyze_patient(
     ):
         severity = "LOW"
         base_message = (
-            "Radiology and laboratory findings show no significant discrepancy."
+            "Radiology, laboratory results, and clinical notes "
+            "show no significant discrepancy."
         )
 
-    # 6️⃣ Generate alert if severity detected
+    # 7️⃣ Generate alert + Gemini explanation
     if severity:
         labs_summary = []
         if crp is not None:
@@ -114,8 +125,9 @@ def analyze_patient(
             labs_summary.append(f"WBC: {wbc} cells/mm3")
 
         ai_explanation = generate_medical_insight(
-            radiology_text=radiology_text,
-            labs_summary=", ".join(labs_summary)
+            radiology_text=radiology_text or "No radiology findings provided.",
+            labs_summary=", ".join(labs_summary) or "No lab abnormalities detected.",
+            clinical_notes=clinical_text or "No clinical notes provided."
         )
 
         alert = Alert(
@@ -129,7 +141,13 @@ def analyze_patient(
 
     db.commit()
 
-    # 7️⃣ JSON response
+    # 8️⃣ Never return empty silently
+    if not alerts:
+        return [{
+            "severity": "INFO",
+            "message": "No clinically significant discrepancy detected."
+        }]
+
     return [
         {
             "patient_id": a.patient_id,

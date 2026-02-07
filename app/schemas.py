@@ -24,3 +24,7 @@ class LabCreate(BaseModel):
     test_name: str
     value: float
     unit: str
+
+class ClinicalNoteCreate(BaseModel):
+    patient_id: str
+    content: str
