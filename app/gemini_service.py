@@ -1,42 +1,36 @@
+import os
 import google.generativeai as genai
-from .config import GEMINI_API_KEY
 
-# Configure Gemini
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# ✅ USE SUPPORTED MODEL
 model = genai.GenerativeModel("models/gemini-1.5-flash")
 
-
-def generate_medical_insight(radiology_text: str, labs_summary: str) -> str:
+def generate_medical_insight(
+    radiology_text: str,
+    labs_summary: str,
+    clinical_notes: str = ""
+):
     try:
         prompt = f"""
-You are a clinical decision support AI assisting doctors.
+You are a clinical decision support AI.
 
-Radiology Report:
+Radiology Findings:
 {radiology_text}
 
-Laboratory Findings:
+Laboratory Results:
 {labs_summary}
 
-Task:
-- Identify contradictions between imaging and lab data
-- Explain possible clinical concern
-- Use cautious, non-diagnostic language
-- Suggest why clinician review is required
-- Do NOT give a diagnosis
+Clinical Notes:
+{clinical_notes}
 
-Response:
-Short professional explanation (3–5 lines).
+Explain any possible discrepancy in simple clinical terms.
 """
-
         response = model.generate_content(prompt)
         return response.text.strip()
 
     except Exception as e:
-        # ✅ SAFE FALLBACK (NO CRASH)
+        # 🔒 NEVER crash analysis
         return (
-            "Radiology findings appear inconsistent with laboratory markers. "
-            "Elevated inflammatory values despite normal imaging may warrant "
-            "clinical correlation and further evaluation."
+            "AI explanation unavailable at the moment. "
+            "Clinical correlation is advised."
         )
