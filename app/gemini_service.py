@@ -5,7 +5,8 @@ import google.generativeai as genai
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not GEMINI_API_KEY:
-    raise RuntimeError("GEMINI_API_KEY is not set")
+    print("⚠️ GEMINI_API_KEY not set. AI explanations will use fallback mode.")
+
 
 genai.configure(api_key=GEMINI_API_KEY)
 
