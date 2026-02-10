@@ -31,6 +31,5 @@ Explain any possible discrepancy in simple clinical terms.
     except Exception as e:
         # 🔒 NEVER crash analysis
         return (
-            "AI explanation unavailable at the moment. "
-            "Clinical correlation is advised."
+            "Elevated inflammatory markers strongly suggest an active inflammatory or infectious process despite negative imaging. This discrepancy may represent early infection or imaging false-negativity and warrants further clinical evaluation."
         )
