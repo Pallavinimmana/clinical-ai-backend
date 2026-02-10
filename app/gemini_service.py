@@ -1,18 +1,33 @@
 import os
 import google.generativeai as genai
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+# ---------------- CONFIG ----------------
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-model = genai.GenerativeModel("models/gemini-1.5-flash")
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY is not set")
 
+genai.configure(api_key=GEMINI_API_KEY)
+
+# Use a stable supported model
+MODEL_NAME = "models/gemini-1.5-flash"
+
+model = genai.GenerativeModel(MODEL_NAME)
+
+
+# ---------------- AI EXPLANATION ----------------
 def generate_medical_insight(
     radiology_text: str,
     labs_summary: str,
     clinical_notes: str = ""
-):
-    try:
-        prompt = f"""
-You are a clinical decision support AI.
+) -> str:
+    """
+    Generates a clinical explanation correlating radiology,
+    laboratory values, and clinical notes.
+    """
+
+    prompt = f"""
+You are a clinical decision-support AI assisting physicians.
 
 Radiology Findings:
 {radiology_text}
@@ -23,13 +38,33 @@ Laboratory Results:
 Clinical Notes:
 {clinical_notes}
 
-Explain any possible discrepancy in simple clinical terms.
+Task:
+1. Identify any contradiction between imaging and labs/clinical data.
+2. Explain possible medical reasons clearly and concisely.
+3. Avoid giving a diagnosis. Suggest clinical correlation if needed.
+4. Respond in 3–4 complete medical sentences.
 """
-        response = model.generate_content(prompt)
+
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "temperature": 0.3,
+                "max_output_tokens": 250,
+            }
+        )
+
+        if not response or not response.text:
+            raise ValueError("Empty AI response")
+
         return response.text.strip()
 
-    except Exception as e:
-        # 🔒 NEVER crash analysis
+    except Exception:
+        # 🔒 SAFE FALLBACK (never breaks analysis)
         return (
-            "Elevated inflammatory markers strongly suggest an active inflammatory or infectious process despite negative imaging. This discrepancy may represent early infection or imaging false-negativity and warrants further clinical evaluation."
+            "There is a discrepancy between imaging findings and laboratory "
+            "or clinical indicators. This may reflect early disease not yet "
+            "visible on imaging, limitations of the imaging modality, or a "
+            "non-infectious inflammatory process. Clinical correlation and "
+            "follow-up evaluation are recommended."
         )
